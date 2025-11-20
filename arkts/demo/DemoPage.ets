@@ -7,92 +7,6 @@ import { CanvasLyricPlayer } from '../components/LyricPlayer';
 import { LyricLine, LyricWord } from '../models/LyricModels';
 
 /**
- * 示例歌词数据
- * Sample lyric data
- */
-function getSampleLyrics(): LyricLine[] {
-  return [
-    new LyricLine(
-      [
-        new LyricWord('如', 0, 500),
-        new LyricWord('果', 500, 1000),
-        new LyricWord('有', 1000, 1500),
-        new LyricWord('一', 1500, 2000),
-        new LyricWord('天', 2000, 2500)
-      ],
-      0, 2500, 'If one day'
-    ),
-    new LyricLine(
-      [
-        new LyricWord('我', 3000, 3500),
-        new LyricWord('悄', 3500, 4000),
-        new LyricWord('然', 4000, 4500),
-        new LyricWord('离', 4500, 5000),
-        new LyricWord('去', 5000, 5500)
-      ],
-      3000, 5500, 'I quietly leave'
-    ),
-    new LyricLine(
-      [
-        new LyricWord('请', 6000, 6500),
-        new LyricWord('把', 6500, 7000),
-        new LyricWord('我', 7000, 7500),
-        new LyricWord('埋', 7500, 8000),
-        new LyricWord('在', 8000, 8500),
-        new LyricWord('这', 8500, 9000),
-        new LyricWord('春', 9000, 9500),
-        new LyricWord('天', 9500, 10000),
-        new LyricWord('里', 10000, 10500)
-      ],
-      6000, 10500, 'Please bury me in this spring'
-    ),
-    new LyricLine(
-      [
-        new LyricWord('I', 11000, 11300),
-        new LyricWord(' ', 11300, 11400),
-        new LyricWord('lean', 11400, 12000),
-        new LyricWord(' ', 12000, 12100),
-        new LyricWord('in', 12100, 12400),
-        new LyricWord(' ', 12400, 12500),
-        new LyricWord('and', 12500, 12800),
-        new LyricWord(' ', 12800, 12900),
-        new LyricWord('you', 12900, 13200),
-        new LyricWord(' ', 13200, 13300),
-        new LyricWord('move', 13300, 13800),
-        new LyricWord(' ', 13800, 13900),
-        new LyricWord('away', 13900, 14500)
-      ],
-      11000, 14500, '我靠近你却离开'
-    ),
-    new LyricLine(
-      [
-        new LyricWord('这', 15000, 15300),
-        new LyricWord('是', 15300, 15600),
-        new LyricWord('背', 15600, 16000),
-        new LyricWord('景', 16000, 16500),
-        new LyricWord('人', 16500, 17000),
-        new LyricWord('声', 17000, 17500)
-      ],
-      15000, 17500, '', '', true, false // 背景歌词
-    ),
-    new LyricLine(
-      [
-        new LyricWord('月', 18000, 18500),
-        new LyricWord('光', 18500, 19000),
-        new LyricWord('还', 19000, 19500),
-        new LyricWord('是', 19500, 20000),
-        new LyricWord('少', 20000, 20500),
-        new LyricWord('年', 20500, 21000),
-        new LyricWord('的', 21000, 21500),
-        new LyricWord('月', 21500, 22000),
-        new LyricWord('光', 22000, 22500)
-      ],
-      18000, 22500, 'The moonlight is still the moonlight of youth'
-    )
-  ];
-}
-
-/**
  * 演示页面
  * Demo page showing how to use the lyric player
  */
@@ -101,9 +15,93 @@ function getSampleLyrics(): LyricLine[] {
 struct DemoPage {
   @State private currentTime: number = 0;
   @State private isPlaying: boolean = false;
+  @State private lyrics: LyricLine[] = [];
   private timer: number = -1;
 
-  aboutToDisappear() {
+  aboutToAppear(): void {
+    // 创建示例歌词
+    this.lyrics = [
+      new LyricLine(
+        [
+          new LyricWord('如', 0, 500),
+          new LyricWord('果', 500, 1000),
+          new LyricWord('有', 1000, 1500),
+          new LyricWord('一', 1500, 2000),
+          new LyricWord('天', 2000, 2500)
+        ],
+        0, 2500, 'If one day'
+      ),
+      new LyricLine(
+        [
+          new LyricWord('我', 3000, 3500),
+          new LyricWord('悄', 3500, 4000),
+          new LyricWord('然', 4000, 4500),
+          new LyricWord('离', 4500, 5000),
+          new LyricWord('去', 5000, 5500)
+        ],
+        3000, 5500, 'I quietly leave'
+      ),
+      new LyricLine(
+        [
+          new LyricWord('请', 6000, 6500),
+          new LyricWord('把', 6500, 7000),
+          new LyricWord('我', 7000, 7500),
+          new LyricWord('埋', 7500, 8000),
+          new LyricWord('在', 8000, 8500),
+          new LyricWord('这', 8500, 9000),
+          new LyricWord('春', 9000, 9500),
+          new LyricWord('天', 9500, 10000),
+          new LyricWord('里', 10000, 10500)
+        ],
+        6000, 10500, 'Please bury me in this spring'
+      ),
+      new LyricLine(
+        [
+          new LyricWord('I', 11000, 11300),
+          new LyricWord(' ', 11300, 11400),
+          new LyricWord('lean', 11400, 12000),
+          new LyricWord(' ', 12000, 12100),
+          new LyricWord('in', 12100, 12400),
+          new LyricWord(' ', 12400, 12500),
+          new LyricWord('and', 12500, 12800),
+          new LyricWord(' ', 12800, 12900),
+          new LyricWord('you', 12900, 13200),
+          new LyricWord(' ', 13200, 13300),
+          new LyricWord('move', 13300, 13800),
+          new LyricWord(' ', 13800, 13900),
+          new LyricWord('away', 13900, 14500)
+        ],
+        11000, 14500, '我靠近你却离开'
+      ),
+      new LyricLine(
+        [
+          new LyricWord('这', 15000, 15300),
+          new LyricWord('是', 15300, 15600),
+          new LyricWord('背', 15600, 16000),
+          new LyricWord('景', 16000, 16500),
+          new LyricWord('人', 16500, 17000),
+          new LyricWord('声', 17000, 17500)
+        ],
+        15000, 17500, '', '', true, false // 背景歌词
+      ),
+      new LyricLine(
+        [
+          new LyricWord('月', 18000, 18500),
+          new LyricWord('光', 18500, 19000),
+          new LyricWord('还', 19000, 19500),
+          new LyricWord('是', 19500, 20000),
+          new LyricWord('少', 20000, 20500),
+          new LyricWord('年', 20500, 21000),
+          new LyricWord('的', 21000, 21500),
+          new LyricWord('月', 21500, 22000),
+          new LyricWord('光', 22000, 22500)
+        ],
+        18000, 22500, 'The moonlight is still the moonlight of youth'
+      )
+    ];
+  }
+
+  aboutToDisappear(): void {
     if (this.timer !== -1) {
       clearInterval(this.timer);
     }
@@ -132,7 +130,7 @@ struct DemoPage {
       clearInterval(this.timer);
     }
 
-    this.timer = setInterval(() => {
+    this.timer = setInterval((): void => {
       this.currentTime += 50;
       if (this.currentTime > 25000) {
         this.currentTime = 0;
@@ -194,7 +192,11 @@ struct DemoPage {
           .backgroundColor('#2C2C2E')
 
         // 歌词播放器组件
-        CanvasLyricPlayer()
+        CanvasLyricPlayer({
+          lyrics: this.lyrics,
+          currentTime: this.currentTime,
+          isPlaying: this.isPlaying
+        })
           .width('100%')
           .height('100%')
       }
@@ -219,7 +221,7 @@ struct DemoPage {
             .trackColor(Color.Gray)
             .selectedColor('#007AFF')
             .layoutWeight(1)
-            .onChange((value: number) => {
+            .onChange((value: number): void => {
               this.seekTo(value);
             })
 
@@ -237,7 +239,7 @@ struct DemoPage {
             .width(80)
             .height(80)
             .backgroundColor('#007AFF')
-            .onClick(() => {
+            .onClick((): void => {
               this.togglePlayPause();
             })
         }
@@ -247,23 +249,23 @@ struct DemoPage {
         // 快捷跳转按钮
         Row({ space: 10 }) {
           Button('0s')
-            .onClick(() => this.seekTo(0))
+            .onClick((): void => { this.seekTo(0); })
             .fontSize(12)
             .width(50)
           Button('5s')
-            .onClick(() => this.seekTo(5000))
+            .onClick((): void => { this.seekTo(5000); })
             .fontSize(12)
             .width(50)
           Button('10s')
-            .onClick(() => this.seekTo(10000))
+            .onClick((): void => { this.seekTo(10000); })
             .fontSize(12)
             .width(50)
           Button('15s')
-            .onClick(() => this.seekTo(15000))
+            .onClick((): void => { this.seekTo(15000); })
             .fontSize(12)
             .width(50)
           Button('20s')
-            .onClick(() => this.seekTo(20000))
+            .onClick((): void => { this.seekTo(20000); })
             .fontSize(12)
             .width(50)
         }

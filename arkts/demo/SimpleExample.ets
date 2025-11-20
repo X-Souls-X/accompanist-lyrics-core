@@ -14,11 +14,13 @@ import { LyricLine, LyricWord } from '../models/LyricModels';
 @Component
 struct SimpleExample {
   @State private currentTime: number = 0;
+  @State private isPlaying: boolean = true;
+  @State private lyrics: LyricLine[] = [];
   private timer: number = -1;
 
-  aboutToAppear() {
+  aboutToAppear(): void {
     // 创建歌词数据
-    const lyrics: LyricLine[] = [
+    this.lyrics = [
       new LyricLine(
         [
           new LyricWord('Hello', 0, 1000),
@@ -40,7 +42,7 @@ struct SimpleExample {
     ];
 
     // 启动定时器模拟播放
-    this.timer = setInterval(() => {
+    this.timer = setInterval((): void => {
       this.currentTime += 50;
       if (this.currentTime > 7000) {
         this.currentTime = 0;
@@ -48,7 +50,7 @@ struct SimpleExample {
     }, 50);
   }
 
-  aboutToDisappear() {
+  aboutToDisappear(): void {
     if (this.timer !== -1) {
       clearInterval(this.timer);
     }
@@ -56,7 +58,11 @@ struct SimpleExample {
 
   build() {
     Column() {
-      CanvasLyricPlayer()
+      CanvasLyricPlayer({
+        lyrics: this.lyrics,
+        currentTime: this.currentTime,
+        isPlaying: this.isPlaying
+      })
         .width('100%')
         .height('100%')
     }

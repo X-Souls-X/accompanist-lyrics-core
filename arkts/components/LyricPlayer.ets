@@ -202,9 +202,9 @@ class LyricLineRenderer {
  */
 @Component
 export struct CanvasLyricPlayer {
-  @State private lyrics: LyricLine[] = [];
-  @State private currentTime: number = 0;
-  @State private isPlaying: boolean = false;
+  @Prop lyrics: LyricLine[] = [];
+  @Prop currentTime: number = 0;
+  @Prop isPlaying: boolean = false;
   private lineRenderers: LyricLineRenderer[] = [];
   private canvasContext: CanvasRenderingContext2D | null = null;
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
@@ -238,13 +238,14 @@ export struct CanvasLyricPlayer {
   private enableScale: boolean = true;
 
   /**
-   * 设置歌词数据
-   * Set lyric lines
+   * 初始化歌词渲染器
+   * Initialize lyric renderers
    */
-  setLyrics(lyrics: LyricLine[]): void {
-    this.lyrics = lyrics;
+  private initLyrics(): void {
+    if (this.lyrics.length === 0) return;
+
     this.lineRenderers = [];
-    for (const line of lyrics) {
+    for (const line of this.lyrics) {
       this.lineRenderers.push(new LyricLineRenderer(line));
     }
 
@@ -254,16 +255,17 @@ export struct CanvasLyricPlayer {
       renderer.scaleSpring.updateParams(this.scaleSpringParams);
     }
 
-    this.calcLayout();
-  }
+    if (this.canvasContext) {
+      for (const renderer of this.lineRenderers) {
+        renderer.relayout(
+          this.canvasContext,
+          this.canvasWidth,
+          this.baseFontSize,
+          this.fontFamily
+        );
+      }
+    }
 
-  /**
-   * 设置当前播放时间
-   * Set current playback time
-   */
-  setCurrentTime(time: number): void {
-    this.currentTime = time;
-    this.updateHotLines();
     this.calcLayout();
   }
 
@@ -277,7 +279,7 @@ export struct CanvasLyricPlayer {
     const addedIds: number[] = [];
 
     // 移除过期的热行
-    this.hotLines.forEach((id: number) => {
+    this.hotLines.forEach((id: number): void => {
       const line = this.lyrics[id];
       if (line && (line.startTime > time || line.endTime <= time)) {
         this.hotLines.delete(id);
@@ -310,7 +312,7 @@ export struct CanvasLyricPlayer {
 
       if (this.bufferedLines.size > 0) {
         let minIndex = Number.MAX_VALUE;
-        this.bufferedLines.forEach((value: number) => {
+        this.bufferedLines.forEach((value: number): void => {
           if (value < minIndex) minIndex = value;
         });
         this.scrollToIndex = minIndex;
@@ -345,7 +347,7 @@ export struct CanvasLyricPlayer {
 
     let latestIndex = this.scrollToIndex;
     if (this.bufferedLines.size > 0) {
-      this.bufferedLines.forEach((value: number) => {
+      this.bufferedLines.forEach((value: number): void => {
         if (value > latestIndex) latestIndex = value;
       });
     }
@@ -392,16 +394,26 @@ export struct CanvasLyricPlayer {
   private onCanvasReady(): void {
     if (!this.canvasContext) return;
 
-    // 重新布局所有行
-    for (const renderer of this.lineRenderers) {
-      renderer.relayout(
-        this.canvasContext,
-        this.canvasWidth,
-        this.baseFontSize,
-        this.fontFamily
-      );
-    }
+    // 初始化歌词
+    this.initLyrics();
+  }
 
+  /**
+   * 组件即将出现
+   * Component about to appear
+   */
+  aboutToAppear(): void {
+    // 初始化歌词
+    this.initLyrics();
+  }
+
+  /**
+   * 监听属性变化
+   * Watch for property changes
+   */
+  aboutToUpdate(): void {
+    // 更新播放时间
+    this.updateHotLines();
     this.calcLayout();
   }
 
@@ -435,7 +447,7 @@ export struct CanvasLyricPlayer {
       .width('100%')
       .height('100%')
       .backgroundColor(Color.Transparent)
-      .onReady(() => {
+      .onReady((): void => {
         this.canvasContext = new CanvasRenderingContext2D(this.settings);
         // 注意：实际使用时需要从Canvas组件获取宽高
         // 这里只是示例，需要根据实际组件大小调整
@@ -455,7 +467,7 @@ export struct CanvasLyricPlayer {
   private startRenderLoop(): void {
     let lastTime = Date.now();
 
-    const loop = () => {
+    const loop = (): void => {
       const currentTime = Date.now();
       const delta = currentTime - lastTime;
       lastTime = currentTime;
@@ -463,27 +475,9 @@ export struct CanvasLyricPlayer {
       this.renderFrame(delta);
 
       // 继续下一帧
-      setTimeout(() => loop(), 16); // 约60fps
+      setTimeout((): void => { loop(); }, 16); // 约60fps
     };
 
     loop();
-  }
-
-  /**
-   * 播放
-   * Play
-   */
-  play(): void {
-    this.isPlaying = true;
-    this.calcLayout();
-  }
-
-  /**
-   * 暂停
-   * Pause
-   */
-  pause(): void {
-    this.isPlaying = false;
-    this.calcLayout();
   }
 }
