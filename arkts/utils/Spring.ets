@@ -24,6 +24,57 @@ export interface SpringParams {
 }
 
 /**
+ * 弹簧参数（可选）
+ * Optional spring parameters
+ */
+interface PartialSpringParams {
+  /** 质量 / Mass */
+  mass?: number;
+
+  /** 阻尼 / Damping */
+  damping?: number;
+
+  /** 刚度 / Stiffness */
+  stiffness?: number;
+
+  /** 软模式 / Soft mode */
+  soft?: boolean;
+}
+
+/**
+ * 队列参数（带延迟）
+ * Queued parameters with delay
+ */
+interface QueuedSpringParams {
+  /** 质量 / Mass */
+  mass?: number;
+
+  /** 阻尼 / Damping */
+  damping?: number;
+
+  /** 刚度 / Stiffness */
+  stiffness?: number;
+
+  /** 软模式 / Soft mode */
+  soft?: boolean;
+
+  /** 延迟时间 / Delay time */
+  time: number;
+}
+
+/**
+ * 队列位置（带延迟）
+ * Queued position with delay
+ */
+interface QueuedPosition {
+  /** 目标位置 / Target position */
+  position: number;
+
+  /** 延迟时间 / Delay time */
+  time: number;
+}
+
+/**
  * 获取函数导数（速度）
  * Get derivative of a function (velocity)
  */
@@ -41,7 +92,7 @@ function solveSpring(
   velocity: number,
   to: number,
   delay: number = 0,
-  params?: Partial<SpringParams>
+  params?: PartialSpringParams
 ): (t: number) => number {
   const soft = params?.soft ?? false;
   const stiffness = params?.stiffness ?? 100;
@@ -86,12 +137,12 @@ export class Spring {
   private currentPosition: number = 0;
   private targetPosition: number = 0;
   private currentTime: number = 0;
-  private params: Partial<SpringParams> = {};
+  private params: PartialSpringParams = {};
   private currentSolver: (t: number) => number;
   private getV: (t: number) => number;
   private getV2: (t: number) => number;
-  private queueParams?: Partial<SpringParams> & { time: number };
-  private queuePosition?: { time: number; position: number };
+  private queueParams?: QueuedSpringParams;
+  private queuePosition?: QueuedPosition;
 
   constructor(currentPosition: number = 0) {
     this.targetPosition = currentPosition;
@@ -157,8 +208,8 @@ export class Spring {
     if (this.queueParams) {
       this.queueParams.time -= delta;
       if (this.queueParams.time <= 0) {
-        // ArkTS 不支持对象展开，手动复制属性
-        const paramsCopy: Partial<SpringParams> = {};
+        // 复制参数（不包括 time）
+        const paramsCopy: PartialSpringParams = {};
         if (this.queueParams.mass !== undefined) paramsCopy.mass = this.queueParams.mass;
         if (this.queueParams.damping !== undefined) paramsCopy.damping = this.queueParams.damping;
         if (this.queueParams.stiffness !== undefined) paramsCopy.stiffness = this.queueParams.stiffness;
@@ -183,23 +234,30 @@ export class Spring {
    * 更新弹簧参数
    * Update spring parameters
    */
-  updateParams(params: Partial<SpringParams>, delay: number = 0): void {
+  updateParams(params: PartialSpringParams, delay: number = 0): void {
     if (delay > 0) {
-      // ArkTS 不支持对象展开，手动合并对象
-      const merged: Partial<SpringParams> & { time: number } = { time: delay };
-      const existing = this.queueParams ?? {};
-      if (existing.mass !== undefined) merged.mass = existing.mass;
-      if (existing.damping !== undefined) merged.damping = existing.damping;
-      if (existing.stiffness !== undefined) merged.stiffness = existing.stiffness;
-      if (existing.soft !== undefined) merged.soft = existing.soft;
+      // 创建队列参数对象
+      const merged: QueuedSpringParams = { time: delay };
+      const existing = this.queueParams;
+
+      // 复制现有队列参数
+      if (existing) {
+        if (existing.mass !== undefined) merged.mass = existing.mass;
+        if (existing.damping !== undefined) merged.damping = existing.damping;
+        if (existing.stiffness !== undefined) merged.stiffness = existing.stiffness;
+        if (existing.soft !== undefined) merged.soft = existing.soft;
+      }
+
+      // 应用新参数
       if (params.mass !== undefined) merged.mass = params.mass;
       if (params.damping !== undefined) merged.damping = params.damping;
       if (params.stiffness !== undefined) merged.stiffness = params.stiffness;
       if (params.soft !== undefined) merged.soft = params.soft;
+
       this.queueParams = merged;
     } else {
       this.queueParams = undefined;
-      // 手动合并参数
+      // 直接更新参数
       if (params.mass !== undefined) this.params.mass = params.mass;
       if (params.damping !== undefined) this.params.damping = params.damping;
       if (params.stiffness !== undefined) this.params.stiffness = params.stiffness;
@@ -214,11 +272,12 @@ export class Spring {
    */
   setTargetPosition(targetPosition: number, delay: number = 0): void {
     if (delay > 0) {
-      // ArkTS 不支持对象展开，手动创建对象
-      this.queuePosition = {
+      // 创建队列位置对象
+      const queued: QueuedPosition = {
         position: targetPosition,
         time: delay
       };
+      this.queuePosition = queued;
     } else {
       this.queuePosition = undefined;
       this.targetPosition = targetPosition;

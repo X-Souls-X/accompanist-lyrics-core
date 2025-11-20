@@ -218,24 +218,27 @@ export struct CanvasLyricPlayer {
   private bufferedLines: Set<number> = new Set();
 
   // 弹簧参数
-  private posYSpringParams: SpringParams = {
-    mass: 0.9,
-    damping: 15,
-    stiffness: 90,
-    soft: false
-  };
-
-  private scaleSpringParams: SpringParams = {
-    mass: 2,
-    damping: 25,
-    stiffness: 100,
-    soft: false
-  };
+  private posYSpringParams: SpringParams = this.createSpringParams(0.9, 15, 90, false);
+  private scaleSpringParams: SpringParams = this.createSpringParams(2, 25, 100, false);
 
   // 对齐参数
   private alignPosition: number = 0.35;
   private enableBlur: boolean = true;
   private enableScale: boolean = true;
+
+  /**
+   * 创建弹簧参数对象
+   * Create spring params object
+   */
+  private createSpringParams(mass: number, damping: number, stiffness: number, soft: boolean): SpringParams {
+    const params: SpringParams = {
+      mass: mass,
+      damping: damping,
+      stiffness: stiffness,
+      soft: soft
+    };
+    return params;
+  }
 
   /**
    * 初始化歌词渲染器
