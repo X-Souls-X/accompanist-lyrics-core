@@ -503,6 +503,12 @@ export struct CanvasLyricPlayer {
       return;
     }
 
+    // 检查尺寸是否有效
+    if (this.canvasWidth <= 0 || this.canvasHeight <= 0) {
+      console.warn('[LyricPlayer] Invalid canvas size:', this.canvasWidth, 'x', this.canvasHeight);
+      return;
+    }
+
     const ctx = this.canvasContext;
 
     // 清空画布
@@ -514,33 +520,52 @@ export struct CanvasLyricPlayer {
 
     // 绘制边框
     ctx.strokeStyle = '#FF0000'; // 红色边框
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, this.canvasWidth - 2, this.canvasHeight - 2);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2, 2, this.canvasWidth - 4, this.canvasHeight - 4);
 
     // === 调试信息文本 ===
     ctx.fillStyle = '#00FF00'; // 绿色文本
     ctx.font = '20px sans-serif';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(`DEBUG: Canvas ${this.canvasWidth}x${this.canvasHeight}`, 10, 10);
+    ctx.fillText(`Canvas: ${this.canvasWidth}x${this.canvasHeight}`, 10, 10);
     ctx.fillText(`Lyrics: ${this.lineRenderers.length} lines`, 10, 35);
     ctx.fillText(`Time: ${this.currentTime}ms`, 10, 60);
     ctx.fillText(`Playing: ${this.isPlaying}`, 10, 85);
+    ctx.fillText(`ScrollIndex: ${this.scrollToIndex}`, 10, 110);
 
     // === 渲染歌词内容 ===
-    ctx.fillStyle = 'white';
-    ctx.font = `${this.baseFontSize}px ${this.fontFamily}`;
-
     if (this.lineRenderers.length === 0) {
-      console.warn('[LyricPlayer] No line renderers available');
       ctx.fillStyle = '#FFFF00'; // 黄色警告文本
-      ctx.fillText('No lyrics loaded', 10, 120);
+      ctx.font = '24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No lyrics loaded', this.canvasWidth / 2, this.canvasHeight / 2);
       return;
     }
 
-    ctx.save();
-    ctx.translate(this.baseFontSize, 150); // 从调试信息下方开始
+    // 简单测试：直接绘制歌词文本（不使用复杂的渲染器）
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `${this.baseFontSize}px ${this.fontFamily}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
 
-    // 渲染所有歌词行
+    let testY = 150;
+    for (let i = 0; i < Math.min(5, this.lineRenderers.length); i++) {
+      const renderer = this.lineRenderers[i];
+      const line = renderer.getLine();
+      const text = line.words.map(w => w.word).join('');
+
+      // 直接绘制文本测试
+      ctx.fillStyle = i === this.scrollToIndex ? '#00FFFF' : '#FFFFFF';
+      ctx.fillText(`${i}: ${text}`, 20, testY);
+      testY += 40;
+    }
+
+    // 保留原有的渲染逻辑（注释掉用于对比）
+    /*
+    ctx.save();
+    ctx.translate(this.baseFontSize, 150);
+
     for (let i = 0; i < this.lineRenderers.length; i++) {
       const renderer = this.lineRenderers[i];
       try {
@@ -551,49 +576,57 @@ export struct CanvasLyricPlayer {
     }
 
     ctx.restore();
+    */
   }
 
   build() {
     Column() {
       Canvas(this.canvasContext)
         .width('100%')
-        .height('100%')
-        .backgroundColor('#00000000') // 透明背景
+        .layoutWeight(1)
+        .backgroundColor('#000000')
         .onReady((): void => {
-          // 初始化 Canvas 上下文
-          if (!this.canvasContext) {
-            this.canvasContext = new CanvasRenderingContext2D(this.settings);
-          }
-
-          console.info('[LyricPlayer] Canvas ready');
+          console.info('[LyricPlayer] Canvas onReady');
           console.info('[LyricPlayer] Lyrics count:', this.lyrics.length);
+          console.info('[LyricPlayer] Initial size:', this.canvasWidth, 'x', this.canvasHeight);
 
-          // 初始化歌词
-          this.onCanvasReady();
-
-          // 启动渲染循环（使用 Animator）
-          this.startRenderLoop();
+          // 不要在这里初始化 context，它已经在构造函数中创建了
+          // 等待 onAreaChange 获取正确尺寸后再初始化歌词
         })
         .onAreaChange((oldArea: Area, newArea: Area): void => {
           // 获取真实的 Canvas 尺寸
-          this.canvasWidth = Number.parseFloat(newArea.width.toString());
-          this.canvasHeight = Number.parseFloat(newArea.height.toString());
+          const newWidth = Number.parseFloat(newArea.width.toString());
+          const newHeight = Number.parseFloat(newArea.height.toString());
 
-          console.info('[LyricPlayer] Area changed:', this.canvasWidth, 'x', this.canvasHeight);
+          console.info('[LyricPlayer] Area changed:', newWidth, 'x', newHeight);
 
-          if (oldArea.width.toString() !== newArea.width.toString() ||
-              oldArea.height.toString() !== newArea.height.toString()) {
-            // 尺寸变化时重新布局
-            if (this.canvasContext && this.lineRenderers.length > 0) {
-              for (const renderer of this.lineRenderers) {
-                renderer.relayout(
-                  this.canvasContext,
-                  this.canvasWidth,
-                  this.baseFontSize,
-                  this.fontFamily
-                );
+          const widthChanged = this.canvasWidth !== newWidth;
+          const heightChanged = this.canvasHeight !== newHeight;
+
+          this.canvasWidth = newWidth;
+          this.canvasHeight = newHeight;
+
+          // 第一次获得有效尺寸时初始化
+          if (widthChanged || heightChanged) {
+            if (this.canvasWidth > 0 && this.canvasHeight > 0) {
+              // 如果还没初始化过，先初始化歌词
+              if (this.lineRenderers.length === 0 && this.lyrics.length > 0) {
+                console.info('[LyricPlayer] First valid size, initializing lyrics');
+                this.onCanvasReady();
+                this.startRenderLoop();
+              } else if (this.lineRenderers.length > 0) {
+                // 已经初始化过，只需要重新布局
+                console.info('[LyricPlayer] Relayouting due to size change');
+                for (const renderer of this.lineRenderers) {
+                  renderer.relayout(
+                    this.canvasContext,
+                    this.canvasWidth,
+                    this.baseFontSize,
+                    this.fontFamily
+                  );
+                }
+                this.calcLayout();
               }
-              this.calcLayout();
             }
           }
         })
