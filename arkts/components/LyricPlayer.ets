@@ -4,7 +4,7 @@
  */
 
 import { LyricLine, LyricWord } from '../models/LyricModels';
-import { Spring, SpringParams } from '../utils/Spring';
+import { Spring, PartialSpringParams } from '../utils/Spring';
 import { TextLayoutEngine, TextLayoutConfig, TextLayoutResult } from '../utils/TextLayout';
 
 /**
@@ -158,7 +158,7 @@ class LyricLineRenderer {
    * 更新渲染
    * Update and render
    */
-  update(delta: number, context: CanvasRenderingContext2D): void {
+  update(delta: number, context: CanvasRenderingContext2D, baseFontSize: number): void {
     this.posYSpring.update(delta);
     this.scaleSpring.update(delta);
 
@@ -167,15 +167,66 @@ class LyricLineRenderer {
 
     context.save();
     context.globalAlpha = this.opacity;
-    context.filter = `blur(${this.blur}px)`;
+    // 注意：HarmonyOS 可能不支持 filter 属性，暂时注释
+    // context.filter = `blur(${this.blur}px)`;
     context.translate(0, posY);
     context.scale(scale, scale);
 
+    // === 方法1：使用离屏 Canvas（如果可用）===
     if (this.lineCanvas) {
-      const image = this.lineCanvas.transferToImageBitmap();
-      context.transferFromImageBitmap(image);
+      try {
+        const image = this.lineCanvas.transferToImageBitmap();
+        context.drawImage(image, 0, 0);
+      } catch (e) {
+        console.error('[LyricLineRenderer] Failed to draw offscreen canvas, falling back to direct render:', e);
+        // 回退到直接渲染
+        this.renderDirect(context, baseFontSize);
+      }
+    } else {
+      // === 方法2：直接渲染文本（调试用）===
+      this.renderDirect(context, baseFontSize);
     }
 
+    context.restore();
+  }
+
+  /**
+   * 直接渲染（不使用离屏 Canvas）
+   * Direct rendering without offscreen canvas
+   */
+  private renderDirect(context: CanvasRenderingContext2D, baseFontSize: number): void {
+    context.fillStyle = 'white';
+    context.textBaseline = 'top';
+    context.textAlign = 'left';
+
+    // 渲染主歌词
+    context.font = `${baseFontSize}px HarmonyOS Sans`;
+    let lineIndex = 0;
+    for (const layout of this.layoutResults) {
+      context.fillText(layout.text, layout.x, layout.lineIndex * baseFontSize);
+      lineIndex = layout.lineIndex;
+    }
+
+    // 渲染翻译歌词
+    context.save();
+    context.translate(0, (lineIndex + 1) * baseFontSize);
+    context.font = `${baseFontSize * 0.5}px HarmonyOS Sans`;
+    context.globalAlpha = 0.5;
+    lineIndex = 0;
+    for (const layout of this.translatedLayoutResults) {
+      context.fillText(layout.text, layout.x, layout.lineIndex * baseFontSize * 0.5);
+      lineIndex = layout.lineIndex;
+    }
+    context.restore();
+
+    // 渲染音译歌词
+    context.save();
+    context.translate(0, (lineIndex + 2) * baseFontSize);
+    context.font = `${baseFontSize * 0.5}px HarmonyOS Sans`;
+    context.globalAlpha = 0.5;
+    for (const layout of this.romanLayoutResults) {
+      context.fillText(layout.text, layout.x, layout.lineIndex * baseFontSize * 0.5);
+    }
     context.restore();
   }
 
@@ -218,8 +269,8 @@ export struct CanvasLyricPlayer {
   private bufferedLines: Set<number> = new Set();
 
   // 弹簧参数
-  private posYSpringParams: SpringParams = this.createSpringParams(0.9, 15, 90, false);
-  private scaleSpringParams: SpringParams = this.createSpringParams(2, 25, 100, false);
+  private posYSpringParams: PartialSpringParams = this.createSpringParams(0.9, 15, 90, false);
+  private scaleSpringParams: PartialSpringParams = this.createSpringParams(2, 25, 100, false);
 
   // 对齐参数
   private alignPosition: number = 0.35;
@@ -230,8 +281,8 @@ export struct CanvasLyricPlayer {
    * 创建弹簧参数对象
    * Create spring params object
    */
-  private createSpringParams(mass: number, damping: number, stiffness: number, soft: boolean): SpringParams {
-    const params: SpringParams = {
+  private createSpringParams(mass: number, damping: number, stiffness: number, soft: boolean): PartialSpringParams {
+    const params: PartialSpringParams = {
       mass: mass,
       damping: damping,
       stiffness: stiffness,
@@ -245,31 +296,48 @@ export struct CanvasLyricPlayer {
    * Initialize lyric renderers
    */
   private initLyrics(): void {
-    if (this.lyrics.length === 0) return;
+    console.info('[LyricPlayer] initLyrics called, lyrics count:', this.lyrics.length);
+
+    if (this.lyrics.length === 0) {
+      console.warn('[LyricPlayer] No lyrics to initialize');
+      return;
+    }
 
     this.lineRenderers = [];
     for (const line of this.lyrics) {
       this.lineRenderers.push(new LyricLineRenderer(line));
     }
+    console.info('[LyricPlayer] Created', this.lineRenderers.length, 'line renderers');
 
     // 初始化弹簧参数
     for (const renderer of this.lineRenderers) {
       renderer.posYSpring.updateParams(this.posYSpringParams);
       renderer.scaleSpring.updateParams(this.scaleSpringParams);
     }
+    console.info('[LyricPlayer] Initialized spring params');
 
     if (this.canvasContext) {
-      for (const renderer of this.lineRenderers) {
-        renderer.relayout(
-          this.canvasContext,
-          this.canvasWidth,
-          this.baseFontSize,
-          this.fontFamily
-        );
+      console.info('[LyricPlayer] Relayout lyrics, canvas size:', this.canvasWidth, 'x', this.canvasHeight);
+      for (let i = 0; i < this.lineRenderers.length; i++) {
+        const renderer = this.lineRenderers[i];
+        try {
+          renderer.relayout(
+            this.canvasContext,
+            this.canvasWidth,
+            this.baseFontSize,
+            this.fontFamily
+          );
+          console.info('[LyricPlayer] Line', i, 'layout complete, height:', renderer.getHeight());
+        } catch (e) {
+          console.error('[LyricPlayer] Error relayouting line', i, ':', e);
+        }
       }
+    } else {
+      console.warn('[LyricPlayer] No canvas context available for relayout');
     }
 
     this.calcLayout();
+    console.info('[LyricPlayer] initLyrics complete');
   }
 
   /**
@@ -425,42 +493,90 @@ export struct CanvasLyricPlayer {
    * Render frame
    */
   private renderFrame(delta: number): void {
-    if (!this.canvasContext) return;
+    if (!this.canvasContext) {
+      console.error('[LyricPlayer] renderFrame: canvasContext is null');
+      return;
+    }
 
     const ctx = this.canvasContext;
 
     // 清空画布
     ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+    // === 调试渲染：绘制背景和边框 ===
+    ctx.fillStyle = '#1A1A1A'; // 深灰色背景便于调试
+    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+    // 绘制边框
+    ctx.strokeStyle = '#FF0000'; // 红色边框
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, this.canvasWidth - 2, this.canvasHeight - 2);
+
+    // === 调试信息文本 ===
+    ctx.fillStyle = '#00FF00'; // 绿色文本
+    ctx.font = '20px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`DEBUG: Canvas ${this.canvasWidth}x${this.canvasHeight}`, 10, 10);
+    ctx.fillText(`Lyrics: ${this.lineRenderers.length} lines`, 10, 35);
+    ctx.fillText(`Time: ${this.currentTime}ms`, 10, 60);
+    ctx.fillText(`Playing: ${this.isPlaying}`, 10, 85);
+
+    // === 渲染歌词内容 ===
     ctx.fillStyle = 'white';
     ctx.font = `${this.baseFontSize}px ${this.fontFamily}`;
 
+    if (this.lineRenderers.length === 0) {
+      console.warn('[LyricPlayer] No line renderers available');
+      ctx.fillStyle = '#FFFF00'; // 黄色警告文本
+      ctx.fillText('No lyrics loaded', 10, 120);
+      return;
+    }
+
     ctx.save();
-    ctx.translate(this.baseFontSize, 0);
+    ctx.translate(this.baseFontSize, 150); // 从调试信息下方开始
 
     // 渲染所有歌词行
-    for (const renderer of this.lineRenderers) {
-      renderer.update(delta / 1000, ctx);
+    for (let i = 0; i < this.lineRenderers.length; i++) {
+      const renderer = this.lineRenderers[i];
+      try {
+        renderer.update(delta / 1000, ctx, this.baseFontSize);
+      } catch (e) {
+        console.error(`[LyricPlayer] Error rendering line ${i}:`, e);
+      }
     }
 
     ctx.restore();
   }
 
   build() {
-    Canvas(this.canvasContext)
-      .width('100%')
-      .height('100%')
-      .backgroundColor(Color.Transparent)
-      .onReady((): void => {
-        this.canvasContext = new CanvasRenderingContext2D(this.settings);
-        // 注意：实际使用时需要从Canvas组件获取宽高
-        // 这里只是示例，需要根据实际组件大小调整
-        this.canvasWidth = 800; // 需要从实际组件获取
-        this.canvasHeight = 600; // 需要从实际组件获取
-        this.onCanvasReady();
+    Column() {
+      Canvas(this.canvasContext)
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#00000000') // 透明背景
+        .onReady((): void => {
+          // 初始化 Canvas 上下文
+          if (!this.canvasContext) {
+            this.canvasContext = new CanvasRenderingContext2D(this.settings);
+          }
 
-        // 启动渲染循环
-        this.startRenderLoop();
-      })
+          // 获取 Canvas 尺寸 (需要在实际使用时调整)
+          // TODO: 从组件实际尺寸获取
+          this.canvasWidth = 800;
+          this.canvasHeight = 600;
+
+          console.info('[LyricPlayer] Canvas ready, size:', this.canvasWidth, 'x', this.canvasHeight);
+          console.info('[LyricPlayer] Lyrics count:', this.lyrics.length);
+
+          // 初始化歌词
+          this.onCanvasReady();
+
+          // 启动渲染循环
+          this.startRenderLoop();
+        })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   /**
@@ -468,7 +584,9 @@ export struct CanvasLyricPlayer {
    * Start render loop
    */
   private startRenderLoop(): void {
+    console.info('[LyricPlayer] Starting render loop');
     let lastTime = Date.now();
+    let frameCount = 0;
 
     const loop = (): void => {
       const currentTime = Date.now();
@@ -476,6 +594,12 @@ export struct CanvasLyricPlayer {
       lastTime = currentTime;
 
       this.renderFrame(delta);
+
+      frameCount++;
+      // 每60帧打印一次日志
+      if (frameCount % 60 === 0) {
+        console.info(`[LyricPlayer] Rendered ${frameCount} frames, FPS: ${1000 / delta}`);
+      }
 
       // 继续下一帧
       setTimeout((): void => { loop(); }, 16); // 约60fps

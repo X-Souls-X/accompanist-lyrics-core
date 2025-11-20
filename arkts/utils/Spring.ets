@@ -27,7 +27,7 @@ export interface SpringParams {
  * 弹簧参数（可选）
  * Optional spring parameters
  */
-interface PartialSpringParams {
+export interface PartialSpringParams {
   /** 质量 / Mass */
   mass?: number;
 
