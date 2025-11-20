@@ -186,7 +186,15 @@ export class TextLayoutEngine {
         if (currentLine) {
           merged.push(currentLine);
         }
-        currentLine = { ...result };
+        // ArkTS 不支持对象展开，手动复制属性
+        currentLine = {
+          text: result.text,
+          index: result.index,
+          lineIndex: result.lineIndex,
+          width: result.width,
+          height: result.height,
+          x: result.x
+        };
       } else {
         currentLine.text += result.text;
         currentLine.width = result.x + result.width - currentLine.x;

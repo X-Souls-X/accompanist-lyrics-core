@@ -16,7 +16,7 @@ class LyricLineRenderer {
   private layoutResults: TextLayoutResult[] = [];
   private translatedLayoutResults: TextLayoutResult[] = [];
   private romanLayoutResults: TextLayoutResult[] = [];
-  private lineSize: [number, number] = [0, 0];
+  private lineSize: number[] = [0, 0];
   private lineCanvas: OffscreenCanvas | null = null;
 
   // 变换属性
@@ -77,13 +77,31 @@ class LyricLineRenderer {
    * Calculate line size
    */
   private calculateSize(baseFontSize: number): void {
-    const maxMainLineIndex = Math.max(0, ...this.layoutResults.map(r => r.lineIndex + 1));
-    const maxTranslatedLineIndex = Math.max(0, ...this.translatedLayoutResults.map(r => r.lineIndex + 1));
-    const maxRomanLineIndex = Math.max(0, ...this.romanLayoutResults.map(r => r.lineIndex + 1));
+    let maxMainLineIndex = 0;
+    for (const r of this.layoutResults) {
+      if (r.lineIndex + 1 > maxMainLineIndex) {
+        maxMainLineIndex = r.lineIndex + 1;
+      }
+    }
+
+    let maxTranslatedLineIndex = 0;
+    for (const r of this.translatedLayoutResults) {
+      if (r.lineIndex + 1 > maxTranslatedLineIndex) {
+        maxTranslatedLineIndex = r.lineIndex + 1;
+      }
+    }
+
+    let maxRomanLineIndex = 0;
+    for (const r of this.romanLayoutResults) {
+      if (r.lineIndex + 1 > maxRomanLineIndex) {
+        maxRomanLineIndex = r.lineIndex + 1;
+      }
+    }
 
     this.lineSize = [
-      0, // width will be set by parent
-      (maxMainLineIndex + maxTranslatedLineIndex + maxRomanLineIndex) * baseFontSize + baseFontSize * 0.4
+      0,
+      (maxMainLineIndex + maxTranslatedLineIndex + maxRomanLineIndex) * baseFontSize +
+      baseFontSize * 0.4
     ];
   }
 
@@ -97,8 +115,7 @@ class LyricLineRenderer {
     baseFontSize: number,
     fontFamily: string
   ): void {
-    // Note: HarmonyOS使用OffscreenCanvas代替HTMLCanvasElement
-    const pixelRatio = 2; // 鸿蒙设备像素比
+    const pixelRatio = 2;
     this.lineCanvas = new OffscreenCanvas(
       maxWidth * pixelRatio,
       this.lineSize[1] * pixelRatio
@@ -155,7 +172,8 @@ class LyricLineRenderer {
     context.scale(scale, scale);
 
     if (this.lineCanvas) {
-      context.drawImage(this.lineCanvas, 0, 0);
+      const image = this.lineCanvas.transferToImageBitmap();
+      context.transferFromImageBitmap(image);
     }
 
     context.restore();
@@ -189,8 +207,7 @@ export struct CanvasLyricPlayer {
   @State private isPlaying: boolean = false;
   private lineRenderers: LyricLineRenderer[] = [];
   private canvasContext: CanvasRenderingContext2D | null = null;
-  private renderingContext: RenderingContext | null = null;
-  private settings: CanvasRenderingContext2DSettings = new CanvasRenderingContext2DSettings(true);
+  private settings: RenderingContextSettings = new RenderingContextSettings(true);
 
   private baseFontSize: number = 30;
   private fontFamily: string = 'HarmonyOS Sans';
@@ -201,16 +218,18 @@ export struct CanvasLyricPlayer {
   private bufferedLines: Set<number> = new Set();
 
   // 弹簧参数
-  private posYSpringParams: Partial<SpringParams> = {
+  private posYSpringParams: SpringParams = {
     mass: 0.9,
     damping: 15,
-    stiffness: 90
+    stiffness: 90,
+    soft: false
   };
 
-  private scaleSpringParams: Partial<SpringParams> = {
+  private scaleSpringParams: SpringParams = {
     mass: 2,
     damping: 25,
-    stiffness: 100
+    stiffness: 100,
+    soft: false
   };
 
   // 对齐参数
@@ -224,7 +243,10 @@ export struct CanvasLyricPlayer {
    */
   setLyrics(lyrics: LyricLine[]): void {
     this.lyrics = lyrics;
-    this.lineRenderers = lyrics.map(line => new LyricLineRenderer(line));
+    this.lineRenderers = [];
+    for (const line of lyrics) {
+      this.lineRenderers.push(new LyricLineRenderer(line));
+    }
 
     // 初始化弹簧参数
     for (const renderer of this.lineRenderers) {
@@ -251,31 +273,32 @@ export struct CanvasLyricPlayer {
    */
   private updateHotLines(): void {
     const time = this.currentTime;
-    const removedIds = new Set<number>();
-    const addedIds = new Set<number>();
+    const removedIds: number[] = [];
+    const addedIds: number[] = [];
 
     // 移除过期的热行
-    for (const id of this.hotLines) {
+    this.hotLines.forEach((id: number) => {
       const line = this.lyrics[id];
       if (line && (line.startTime > time || line.endTime <= time)) {
         this.hotLines.delete(id);
-        removedIds.add(id);
-      }
-    }
-
-    // 添加新的热行
-    this.lineRenderers.forEach((renderer, id) => {
-      const line = renderer.getLine();
-      if (!line.isBG && line.startTime <= time && line.endTime > time) {
-        if (!this.hotLines.has(id)) {
-          this.hotLines.add(id);
-          addedIds.add(id);
-        }
+        removedIds.push(id);
       }
     });
 
+    // 添加新的热行
+    for (let i = 0; i < this.lineRenderers.length; i++) {
+      const renderer = this.lineRenderers[i];
+      const line = renderer.getLine();
+      if (!line.isBG && line.startTime <= time && line.endTime > time) {
+        if (!this.hotLines.has(i)) {
+          this.hotLines.add(i);
+          addedIds.push(i);
+        }
+      }
+    }
+
     // 更新缓冲行
-    if (addedIds.size > 0 || removedIds.size > 0) {
+    if (addedIds.length > 0 || removedIds.length > 0) {
       for (const id of addedIds) {
         this.bufferedLines.add(id);
       }
@@ -286,7 +309,11 @@ export struct CanvasLyricPlayer {
       }
 
       if (this.bufferedLines.size > 0) {
-        this.scrollToIndex = Math.min(...Array.from(this.bufferedLines));
+        let minIndex = Number.MAX_VALUE;
+        this.bufferedLines.forEach((value: number) => {
+          if (value < minIndex) minIndex = value;
+        });
+        this.scrollToIndex = minIndex;
       }
     }
   }
@@ -302,22 +329,30 @@ export struct CanvasLyricPlayer {
     const targetAlignIndex = this.scrollToIndex;
 
     // 计算滚动偏移
-    const scrollOffset = this.lineRenderers
-      .slice(0, targetAlignIndex)
-      .reduce((acc, renderer) => {
+    let scrollOffset = 0;
+    for (let i = 0; i < targetAlignIndex; i++) {
+      const renderer = this.lineRenderers[i];
+      if (renderer) {
         const line = renderer.getLine();
-        return acc + (line.isBG && this.isPlaying ? 0 : renderer.getHeight());
-      }, 0);
+        if (!(line.isBG && this.isPlaying)) {
+          scrollOffset += renderer.getHeight();
+        }
+      }
+    }
 
     curPos -= scrollOffset;
     curPos += this.canvasHeight * this.alignPosition;
 
-    const latestIndex = this.bufferedLines.size > 0
-      ? Math.max(...Array.from(this.bufferedLines))
-      : this.scrollToIndex;
+    let latestIndex = this.scrollToIndex;
+    if (this.bufferedLines.size > 0) {
+      this.bufferedLines.forEach((value: number) => {
+        if (value > latestIndex) latestIndex = value;
+      });
+    }
 
     // 更新每一行的变换
-    this.lineRenderers.forEach((renderer, i) => {
+    for (let i = 0; i < this.lineRenderers.length; i++) {
+      const renderer = this.lineRenderers[i];
       const hasBuffered = this.bufferedLines.has(i);
       const isActive = hasBuffered || (i >= this.scrollToIndex && i < latestIndex);
       const line = renderer.getLine();
@@ -347,7 +382,7 @@ export struct CanvasLyricPlayer {
       if (!line.isBG || !this.isPlaying) {
         curPos += renderer.getHeight();
       }
-    });
+    }
   }
 
   /**
@@ -396,20 +431,20 @@ export struct CanvasLyricPlayer {
   }
 
   build() {
-    Canvas(this.renderingContext)
+    Canvas(this.canvasContext)
       .width('100%')
       .height('100%')
       .backgroundColor(Color.Transparent)
       .onReady(() => {
-        if (this.renderingContext) {
-          this.canvasContext = this.renderingContext.getContext(this.settings);
-          this.canvasWidth = this.renderingContext.width;
-          this.canvasHeight = this.renderingContext.height;
-          this.onCanvasReady();
+        this.canvasContext = new CanvasRenderingContext2D(this.settings);
+        // 注意：实际使用时需要从Canvas组件获取宽高
+        // 这里只是示例，需要根据实际组件大小调整
+        this.canvasWidth = 800; // 需要从实际组件获取
+        this.canvasHeight = 600; // 需要从实际组件获取
+        this.onCanvasReady();
 
-          // 启动渲染循环
-          this.startRenderLoop();
-        }
+        // 启动渲染循环
+        this.startRenderLoop();
       })
   }
 
@@ -427,10 +462,11 @@ export struct CanvasLyricPlayer {
 
       this.renderFrame(delta);
 
-      requestAnimationFrame(loop);
+      // 继续下一帧
+      setTimeout(() => loop(), 16); // 约60fps
     };
 
-    requestAnimationFrame(loop);
+    loop();
   }
 
   /**

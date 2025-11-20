@@ -157,7 +157,13 @@ export class Spring {
     if (this.queueParams) {
       this.queueParams.time -= delta;
       if (this.queueParams.time <= 0) {
-        this.updateParams({ ...this.queueParams });
+        // ArkTS 不支持对象展开，手动复制属性
+        const paramsCopy: Partial<SpringParams> = {};
+        if (this.queueParams.mass !== undefined) paramsCopy.mass = this.queueParams.mass;
+        if (this.queueParams.damping !== undefined) paramsCopy.damping = this.queueParams.damping;
+        if (this.queueParams.stiffness !== undefined) paramsCopy.stiffness = this.queueParams.stiffness;
+        if (this.queueParams.soft !== undefined) paramsCopy.soft = this.queueParams.soft;
+        this.updateParams(paramsCopy);
       }
     }
 
@@ -179,17 +185,25 @@ export class Spring {
    */
   updateParams(params: Partial<SpringParams>, delay: number = 0): void {
     if (delay > 0) {
-      this.queueParams = {
-        ...(this.queueParams ?? {}),
-        ...params,
-        time: delay,
-      };
+      // ArkTS 不支持对象展开，手动合并对象
+      const merged: Partial<SpringParams> & { time: number } = { time: delay };
+      const existing = this.queueParams ?? {};
+      if (existing.mass !== undefined) merged.mass = existing.mass;
+      if (existing.damping !== undefined) merged.damping = existing.damping;
+      if (existing.stiffness !== undefined) merged.stiffness = existing.stiffness;
+      if (existing.soft !== undefined) merged.soft = existing.soft;
+      if (params.mass !== undefined) merged.mass = params.mass;
+      if (params.damping !== undefined) merged.damping = params.damping;
+      if (params.stiffness !== undefined) merged.stiffness = params.stiffness;
+      if (params.soft !== undefined) merged.soft = params.soft;
+      this.queueParams = merged;
     } else {
       this.queueParams = undefined;
-      this.params = {
-        ...this.params,
-        ...params,
-      };
+      // 手动合并参数
+      if (params.mass !== undefined) this.params.mass = params.mass;
+      if (params.damping !== undefined) this.params.damping = params.damping;
+      if (params.stiffness !== undefined) this.params.stiffness = params.stiffness;
+      if (params.soft !== undefined) this.params.soft = params.soft;
       this.resetSolver();
     }
   }
@@ -200,10 +214,10 @@ export class Spring {
    */
   setTargetPosition(targetPosition: number, delay: number = 0): void {
     if (delay > 0) {
+      // ArkTS 不支持对象展开，手动创建对象
       this.queuePosition = {
-        ...(this.queuePosition ?? {}),
         position: targetPosition,
-        time: delay,
+        time: delay
       };
     } else {
       this.queuePosition = undefined;
