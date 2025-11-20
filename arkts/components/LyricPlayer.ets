@@ -494,129 +494,231 @@ export struct CanvasLyricPlayer {
   }
 
   /**
-   * 渲染帧
-   * Render frame
+   * 渲染帧 - 每帧都会被 Animator 调用
+   * Render frame - Called by Animator on each frame
+   *
+   * @param delta 距离上一帧的时间间隔（毫秒）
    */
   private renderFrame(delta: number): void {
+    // ============================================================
+    // 第一步：验证 Canvas 上下文是否存在
+    // Step 1: Validate Canvas context exists
+    // ============================================================
     if (!this.canvasContext) {
-      console.error('[LyricPlayer] renderFrame: canvasContext is null');
+      console.error('[LyricPlayer] ❌ renderFrame: canvasContext is null!');
       return;
     }
 
-    // 检查尺寸是否有效
+    // ============================================================
+    // 第二步：验证 Canvas 尺寸是否有效
+    // Step 2: Validate Canvas size is valid
+    // ============================================================
     if (this.canvasWidth <= 0 || this.canvasHeight <= 0) {
-      console.warn('[LyricPlayer] Invalid canvas size:', this.canvasWidth, 'x', this.canvasHeight);
+      console.warn('[LyricPlayer] ⚠️ Invalid canvas size:', this.canvasWidth, 'x', this.canvasHeight);
       return;
     }
 
+    // 如果能执行到这里，说明 Canvas 上下文和尺寸都正常
+    // If we reach here, Canvas context and size are both valid
     const ctx = this.canvasContext;
 
-    // 清空画布
-    ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    try {
+      // ============================================================
+      // 第三步：清空画布
+      // Step 3: Clear the canvas
+      // ============================================================
+      ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+      console.info('[LyricPlayer] ✓ Canvas cleared');
 
-    // === 调试渲染：绘制背景和边框 ===
-    ctx.fillStyle = '#1A1A1A'; // 深灰色背景便于调试
-    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+      // ============================================================
+      // 第四步：绘制深灰色背景（用于调试）
+      // Step 4: Draw dark gray background (for debugging)
+      // ============================================================
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+      console.info('[LyricPlayer] ✓ Background drawn');
 
-    // 绘制边框
-    ctx.strokeStyle = '#FF0000'; // 红色边框
-    ctx.lineWidth = 3;
-    ctx.strokeRect(2, 2, this.canvasWidth - 4, this.canvasHeight - 4);
+      // ============================================================
+      // 第五步：绘制红色边框（用于确认 Canvas 正在绘制）
+      // Step 5: Draw red border (to confirm Canvas is drawing)
+      // ============================================================
+      ctx.strokeStyle = '#FF0000';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, this.canvasWidth - 4, this.canvasHeight - 4);
+      console.info('[LyricPlayer] ✓ Red border drawn');
 
-    // === 调试信息文本 ===
-    ctx.fillStyle = '#00FF00'; // 绿色文本
-    ctx.font = '20px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`Canvas: ${this.canvasWidth}x${this.canvasHeight}`, 10, 10);
-    ctx.fillText(`Lyrics: ${this.lineRenderers.length} lines`, 10, 35);
-    ctx.fillText(`Time: ${this.currentTime}ms`, 10, 60);
-    ctx.fillText(`Playing: ${this.isPlaying}`, 10, 85);
-    ctx.fillText(`ScrollIndex: ${this.scrollToIndex}`, 10, 110);
+      // ============================================================
+      // 第六步：绘制调试信息文本（绿色）
+      // Step 6: Draw debug info text (green)
+      // ============================================================
+      ctx.fillStyle = '#00FF00';
+      ctx.font = '20px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`Canvas: ${this.canvasWidth}x${this.canvasHeight}`, 10, 10);
+      ctx.fillText(`Lyrics: ${this.lineRenderers.length} lines`, 10, 35);
+      ctx.fillText(`Time: ${this.currentTime}ms`, 10, 60);
+      ctx.fillText(`Playing: ${this.isPlaying}`, 10, 85);
+      ctx.fillText(`ScrollIndex: ${this.scrollToIndex}`, 10, 110);
+      console.info('[LyricPlayer] ✓ Debug text drawn');
 
-    // === 渲染歌词内容 ===
-    if (this.lineRenderers.length === 0) {
-      ctx.fillStyle = '#FFFF00'; // 黄色警告文本
-      ctx.font = '24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('No lyrics loaded', this.canvasWidth / 2, this.canvasHeight / 2);
-      return;
-    }
-
-    // 简单测试：直接绘制歌词文本（不使用复杂的渲染器）
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = `${this.baseFontSize}px ${this.fontFamily}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-
-    let testY = 150;
-    for (let i = 0; i < Math.min(5, this.lineRenderers.length); i++) {
-      const renderer = this.lineRenderers[i];
-      const line = renderer.getLine();
-      const text = line.words.map(w => w.word).join('');
-
-      // 直接绘制文本测试
-      ctx.fillStyle = i === this.scrollToIndex ? '#00FFFF' : '#FFFFFF';
-      ctx.fillText(`${i}: ${text}`, 20, testY);
-      testY += 40;
-    }
-
-    // 保留原有的渲染逻辑（注释掉用于对比）
-    /*
-    ctx.save();
-    ctx.translate(this.baseFontSize, 150);
-
-    for (let i = 0; i < this.lineRenderers.length; i++) {
-      const renderer = this.lineRenderers[i];
-      try {
-        renderer.update(delta / 1000, ctx, this.baseFontSize);
-      } catch (e) {
-        console.error(`[LyricPlayer] Error rendering line ${i}:`, e);
+      // ============================================================
+      // 第七步：检查是否有歌词数据
+      // Step 7: Check if lyrics data exists
+      // ============================================================
+      if (this.lineRenderers.length === 0) {
+        // 没有歌词 - 显示黄色警告文本
+        // No lyrics - show yellow warning text
+        ctx.fillStyle = '#FFFF00';
+        ctx.font = '24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No lyrics loaded', this.canvasWidth / 2, this.canvasHeight / 2);
+        console.warn('[LyricPlayer] ⚠️ No lyrics to render');
+        return;
       }
-    }
 
-    ctx.restore();
-    */
+      // ============================================================
+      // 第八步：绘制歌词文本（简化版，用于测试）
+      // Step 8: Draw lyrics text (simplified version for testing)
+      // ============================================================
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `${this.baseFontSize}px ${this.fontFamily}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      let testY = 150;
+      const maxLines = Math.min(5, this.lineRenderers.length);
+
+      for (let i = 0; i < maxLines; i++) {
+        const renderer = this.lineRenderers[i];
+        const line = renderer.getLine();
+        const text = line.words.map(w => w.word).join('');
+
+        // 当前播放行显示为青色，其他行显示为白色
+        // Current playing line in cyan, others in white
+        ctx.fillStyle = i === this.scrollToIndex ? '#00FFFF' : '#FFFFFF';
+        ctx.fillText(`${i}: ${text}`, 20, testY);
+        testY += 40;
+      }
+      console.info('[LyricPlayer] ✓ Lyrics text drawn, lines:', maxLines);
+
+      // ============================================================
+      // 原有的复杂渲染逻辑（暂时注释掉用于调试）
+      // Original complex rendering logic (commented out for debugging)
+      // ============================================================
+      /*
+      ctx.save();
+      ctx.translate(this.baseFontSize, 150);
+
+      for (let i = 0; i < this.lineRenderers.length; i++) {
+        const renderer = this.lineRenderers[i];
+        try {
+          renderer.update(delta / 1000, ctx, this.baseFontSize);
+        } catch (e) {
+          console.error(`[LyricPlayer] Error rendering line ${i}:`, e);
+        }
+      }
+
+      ctx.restore();
+      */
+
+    } catch (error) {
+      // ============================================================
+      // 捕获并记录任何渲染错误
+      // Catch and log any rendering errors
+      // ============================================================
+      console.error('[LyricPlayer] ❌ Error in renderFrame:', error);
+    }
   }
 
+  /**
+   * 构建 UI 组件
+   * Build UI component
+   *
+   * 重要说明：
+   * 1. Canvas 组件接收 canvasContext（已在构造函数中创建）
+   * 2. onReady 只是标记 Canvas 已准备好，但此时还没有尺寸
+   * 3. onAreaChange 是获取真实尺寸的唯一方式，在这里初始化
+   */
   build() {
     Column() {
       Canvas(this.canvasContext)
         .width('100%')
-        .layoutWeight(1)
+        .layoutWeight(1)  // 使用 layoutWeight 而不是固定高度
         .backgroundColor('#000000')
         .onReady((): void => {
-          console.info('[LyricPlayer] Canvas onReady');
-          console.info('[LyricPlayer] Lyrics count:', this.lyrics.length);
-          console.info('[LyricPlayer] Initial size:', this.canvasWidth, 'x', this.canvasHeight);
+          // ============================================================
+          // Canvas 组件已准备好（但还没有尺寸信息）
+          // Canvas component is ready (but no size info yet)
+          // ============================================================
+          console.info('[LyricPlayer] 🎨 Canvas onReady event triggered');
+          console.info('[LyricPlayer]   - Lyrics count:', this.lyrics.length);
+          console.info('[LyricPlayer]   - Initial size:', this.canvasWidth, 'x', this.canvasHeight, '(还是初始值)');
 
-          // 不要在这里初始化 context，它已经在构造函数中创建了
+          // 注意：不要在这里初始化 context，它已经在构造函数中创建了
+          // Note: Don't initialize context here, it's already created in constructor
           // 等待 onAreaChange 获取正确尺寸后再初始化歌词
+          // Wait for onAreaChange to get correct size before initializing lyrics
         })
         .onAreaChange((oldArea: Area, newArea: Area): void => {
-          // 获取真实的 Canvas 尺寸
+          // ============================================================
+          // Canvas 区域变化事件 - 这是获取真实尺寸的唯一途径
+          // Canvas area change event - This is the only way to get real size
+          // ============================================================
+
+          // 解析新的宽度和高度
+          // Parse new width and height
           const newWidth = Number.parseFloat(newArea.width.toString());
           const newHeight = Number.parseFloat(newArea.height.toString());
 
-          console.info('[LyricPlayer] Area changed:', newWidth, 'x', newHeight);
+          console.info('[LyricPlayer] 📏 Area changed:');
+          console.info('[LyricPlayer]   - Old:', oldArea.width, 'x', oldArea.height);
+          console.info('[LyricPlayer]   - New:', newWidth, 'x', newHeight);
 
+          // 检查尺寸是否真的变化了
+          // Check if size really changed
           const widthChanged = this.canvasWidth !== newWidth;
           const heightChanged = this.canvasHeight !== newHeight;
 
+          // 更新存储的尺寸
+          // Update stored size
           this.canvasWidth = newWidth;
           this.canvasHeight = newHeight;
 
-          // 第一次获得有效尺寸时初始化
+          // ============================================================
+          // 只有在尺寸变化且有效时才处理
+          // Only process if size changed and is valid
+          // ============================================================
           if (widthChanged || heightChanged) {
             if (this.canvasWidth > 0 && this.canvasHeight > 0) {
-              // 如果还没初始化过，先初始化歌词
+              console.info('[LyricPlayer] ✓ Valid size obtained:', this.canvasWidth, 'x', this.canvasHeight);
+
+              // ============================================================
+              // 情况1：首次获得有效尺寸且有歌词数据 - 进行初始化
+              // Case 1: First time getting valid size with lyrics data - Initialize
+              // ============================================================
               if (this.lineRenderers.length === 0 && this.lyrics.length > 0) {
-                console.info('[LyricPlayer] First valid size, initializing lyrics');
-                this.onCanvasReady();
-                this.startRenderLoop();
-              } else if (this.lineRenderers.length > 0) {
-                // 已经初始化过，只需要重新布局
-                console.info('[LyricPlayer] Relayouting due to size change');
+                console.info('[LyricPlayer] 🚀 First valid size, initializing lyrics...');
+                this.onCanvasReady();  // 初始化歌词渲染器
+                this.startRenderLoop();  // 启动 Animator 渲染循环
+                console.info('[LyricPlayer] ✓ Initialization complete');
+              }
+              // ============================================================
+              // 情况2：已经初始化过 - 只需要重新布局
+              // Case 2: Already initialized - Just relayout
+              // ============================================================
+              else if (this.lineRenderers.length > 0) {
+                console.info('[LyricPlayer] 🔄 Relayouting due to size change...');
+
+                // 添加 null 检查以满足 TypeScript 类型要求
+                // Add null check for TypeScript type requirement
+                if (!this.canvasContext) {
+                  console.error('[LyricPlayer] ❌ canvasContext is null during relayout');
+                  return;
+                }
+
+                // 重新布局所有歌词行
+                // Relayout all lyric lines
                 for (const renderer of this.lineRenderers) {
                   renderer.relayout(
                     this.canvasContext,
@@ -626,7 +728,10 @@ export struct CanvasLyricPlayer {
                   );
                 }
                 this.calcLayout();
+                console.info('[LyricPlayer] ✓ Relayout complete');
               }
+            } else {
+              console.warn('[LyricPlayer] ⚠️ Size is still invalid:', this.canvasWidth, 'x', this.canvasHeight);
             }
           }
         })
@@ -638,55 +743,112 @@ export struct CanvasLyricPlayer {
   /**
    * 启动渲染循环（使用 Animator 驱动）
    * Start render loop using Animator
+   *
+   * 重要说明：
+   * 1. 使用 Animator 而不是 setTimeout 来驱动渲染循环
+   * 2. Animator.onFrame 会在每一帧时被调用
+   * 3. iterations: -1 表示无限循环
+   * 4. 这是华为官方推荐的渲染方式
    */
   private startRenderLoop(): void {
-    console.info('[LyricPlayer] Starting render loop with Animator');
+    console.info('[LyricPlayer] ⚙️ Starting render loop with Animator');
 
+    // ============================================================
+    // 第一步：清理之前的 Animator（如果存在）
+    // Step 1: Clean up previous Animator (if exists)
+    // ============================================================
     if (this.renderAnimator) {
+      console.warn('[LyricPlayer] ⚠️ Stopping previous animator');
       this.renderAnimator.finish();
     }
 
+    // ============================================================
+    // 第二步：初始化时间戳
+    // Step 2: Initialize timestamp
+    // ============================================================
     this.lastFrameTime = Date.now();
+    console.info('[LyricPlayer] ⏱️ Initial timestamp:', this.lastFrameTime);
 
-    // 创建一个无限循环的 Animator
-    this.renderAnimator = this.getUIContext().createAnimator({
-      duration: 1000000, // 很长的持续时间
-      easing: 'linear',
-      delay: 0,
-      fill: 'forwards',
-      direction: 'normal',
-      iterations: -1, // 无限循环
-      begin: 0,
-      end: 1
-    });
+    // ============================================================
+    // 第三步：创建 Animator 对象
+    // Step 3: Create Animator object
+    // ============================================================
+    try {
+      this.renderAnimator = this.getUIContext().createAnimator({
+        duration: 1000000,     // 持续时间：1000秒（足够长）
+        easing: 'linear',      // 线性缓动（匀速）
+        delay: 0,              // 无延迟
+        fill: 'forwards',      // 动画结束后保持最终状态
+        direction: 'normal',   // 正向播放
+        iterations: -1,        // 无限循环（-1 表示永久）
+        begin: 0,              // 起始值
+        end: 1                 // 结束值
+      });
+      console.info('[LyricPlayer] ✓ Animator created successfully');
+    } catch (error) {
+      console.error('[LyricPlayer] ❌ Failed to create Animator:', error);
+      return;
+    }
 
+    // ============================================================
+    // 第四步：设置 onFrame 回调（每帧都会被调用）
+    // Step 4: Setup onFrame callback (called every frame)
+    // ============================================================
     let frameCount = 0;
     let that = this;
 
-    // 使用 onFrame 驱动渲染
     this.renderAnimator.onFrame = (value: number): void => {
+      // 计算距离上一帧的时间间隔（用于动画插值）
+      // Calculate time delta since last frame (for animation interpolation)
       const currentTime = Date.now();
       const delta = currentTime - that.lastFrameTime;
       that.lastFrameTime = currentTime;
 
+      // 调用渲染函数
+      // Call render function
       that.renderFrame(delta);
 
       frameCount++;
-      // 每60帧打印一次日志
+
+      // 每60帧（约1秒）打印一次日志
+      // Log every 60 frames (about 1 second)
       if (frameCount % 60 === 0) {
-        console.info(`[LyricPlayer] Rendered ${frameCount} frames, delta: ${delta}ms`);
+        console.info(`[LyricPlayer] 🎬 Rendered ${frameCount} frames, delta: ${delta}ms`);
+      }
+
+      // 前几帧打印详细日志用于调试
+      // Print detailed logs for first few frames for debugging
+      if (frameCount <= 5) {
+        console.info(`[LyricPlayer] 🎬 Frame ${frameCount}, value: ${value}, delta: ${delta}ms`);
       }
     };
 
+    // ============================================================
+    // 第五步：设置取消回调
+    // Step 5: Setup cancel callback
+    // ============================================================
     this.renderAnimator.onCancel = (): void => {
-      console.info('[LyricPlayer] Animator cancelled');
+      console.info('[LyricPlayer] 🛑 Animator cancelled');
     };
 
+    // ============================================================
+    // 第六步：设置完成回调
+    // Step 6: Setup finish callback
+    // ============================================================
     this.renderAnimator.onFinish = (): void => {
-      console.info('[LyricPlayer] Animator finished');
+      console.info('[LyricPlayer] ✅ Animator finished');
     };
 
-    this.renderAnimator.play();
-    console.info('[LyricPlayer] Animator started');
+    // ============================================================
+    // 第七步：启动 Animator
+    // Step 7: Start the Animator
+    // ============================================================
+    try {
+      this.renderAnimator.play();
+      console.info('[LyricPlayer] ▶️ Animator play() called - render loop should start now');
+      console.info('[LyricPlayer] 👀 Watch for "Frame X" messages to confirm rendering is working');
+    } catch (error) {
+      console.error('[LyricPlayer] ❌ Failed to play Animator:', error);
+    }
   }
 }
