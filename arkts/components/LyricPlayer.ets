@@ -258,8 +258,11 @@ export struct CanvasLyricPlayer {
   @Prop currentTime: number = 0;
   @Prop isPlaying: boolean = false;
   private lineRenderers: LyricLineRenderer[] = [];
-  private canvasContext: CanvasRenderingContext2D | null = null;
+
+  // 🔥 关键修复：在声明时就创建 CanvasRenderingContext2D 对象（参考华为官方代码）
+  // Key fix: Create CanvasRenderingContext2D object at declaration (following Huawei's code)
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
+  private canvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
   private baseFontSize: number = 30;
   private fontFamily: string = 'HarmonyOS Sans';
