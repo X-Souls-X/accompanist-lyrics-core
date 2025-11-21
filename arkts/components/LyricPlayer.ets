@@ -109,6 +109,9 @@ class LyricLineRenderer {
   /**
    * 创建离屏Canvas用于缓存渲染
    * Create offscreen canvas for cached rendering
+   *
+   * ⚠️ 暂时禁用：HarmonyOS 的 transferToImageBitmap() 可能导致崩溃
+   * Temporarily disabled: transferToImageBitmap() may cause crashes on HarmonyOS
    */
   private createOffscreenCanvas(
     context: CanvasRenderingContext2D,
@@ -116,6 +119,12 @@ class LyricLineRenderer {
     baseFontSize: number,
     fontFamily: string
   ): void {
+    // 暂时禁用 OffscreenCanvas，使用直接渲染模式
+    // Temporarily disable OffscreenCanvas, use direct rendering mode
+    this.lineCanvas = null;
+    console.info('[LyricLineRenderer] OffscreenCanvas disabled, using direct rendering');
+
+    /* 原 OffscreenCanvas 代码（暂时禁用）
     const pixelRatio = 2;
     this.lineCanvas = new OffscreenCanvas(
       maxWidth * pixelRatio,
@@ -153,6 +162,7 @@ class LyricLineRenderer {
     for (const layout of this.romanLayoutResults) {
       ctx.fillText(layout.text, layout.x, layout.lineIndex * baseFontSize);
     }
+    */
   }
 
   /**
