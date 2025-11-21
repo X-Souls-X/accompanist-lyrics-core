@@ -479,8 +479,11 @@ export struct CanvasLyricPlayer {
    * Component about to appear
    */
   aboutToAppear(): void {
-    // 初始化歌词
-    this.initLyrics();
+    // ❌ 不要在这里初始化！此时 Canvas 还没有尺寸
+    // Don't initialize here! Canvas doesn't have size yet
+    // 等待 onAreaChange 获得有效尺寸后再初始化
+    // Wait for onAreaChange to get valid size before initializing
+    console.info('[LyricPlayer] 🎬 aboutToAppear called');
   }
 
   /**
@@ -700,6 +703,12 @@ export struct CanvasLyricPlayer {
               if (this.lineRenderers.length === 0 && this.lyrics.length > 0) {
                 console.info('[LyricPlayer] 🚀 First valid size, initializing lyrics...');
                 this.onCanvasReady();  // 初始化歌词渲染器
+
+                // 🔥 关键：立即绘制一次（参考华为官方做法）
+                // Key: Draw immediately (following Huawei's approach)
+                console.info('[LyricPlayer] 🎨 Drawing initial frame...');
+                this.renderFrame(0);
+
                 this.startRenderLoop();  // 启动 Animator 渲染循环
                 console.info('[LyricPlayer] ✓ Initialization complete');
               }
@@ -729,6 +738,15 @@ export struct CanvasLyricPlayer {
                 }
                 this.calcLayout();
                 console.info('[LyricPlayer] ✓ Relayout complete');
+
+                // 🔥 如果渲染循环还没启动，启动它
+                // If render loop hasn't started yet, start it
+                if (!this.renderAnimator) {
+                  console.info('[LyricPlayer] 🎨 Drawing initial frame after relayout...');
+                  this.renderFrame(0);
+                  this.startRenderLoop();
+                  console.info('[LyricPlayer] ✓ Render loop started');
+                }
               }
             } else {
               console.warn('[LyricPlayer] ⚠️ Size is still invalid:', this.canvasWidth, 'x', this.canvasHeight);
