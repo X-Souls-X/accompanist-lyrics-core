@@ -534,43 +534,17 @@ export struct CanvasLyricPlayer {
       // Step 3: Clear the canvas
       // ============================================================
       ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-      console.info('[LyricPlayer] ✓ Canvas cleared');
 
       // ============================================================
-      // 第四步：绘制深灰色背景（用于调试）
-      // Step 4: Draw dark gray background (for debugging)
+      // 第四步：绘制深灰色背景
+      // Step 4: Draw dark gray background
       // ============================================================
       ctx.fillStyle = '#1A1A1A';
       ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
-      console.info('[LyricPlayer] ✓ Background drawn');
 
       // ============================================================
-      // 第五步：绘制红色边框（用于确认 Canvas 正在绘制）
-      // Step 5: Draw red border (to confirm Canvas is drawing)
-      // ============================================================
-      ctx.strokeStyle = '#FF0000';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(2, 2, this.canvasWidth - 4, this.canvasHeight - 4);
-      console.info('[LyricPlayer] ✓ Red border drawn');
-
-      // ============================================================
-      // 第六步：绘制调试信息文本（绿色）
-      // Step 6: Draw debug info text (green)
-      // ============================================================
-      ctx.fillStyle = '#00FF00';
-      ctx.font = '20px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(`Canvas: ${this.canvasWidth}x${this.canvasHeight}`, 10, 10);
-      ctx.fillText(`Lyrics: ${this.lineRenderers.length} lines`, 10, 35);
-      ctx.fillText(`Time: ${this.currentTime}ms`, 10, 60);
-      ctx.fillText(`Playing: ${this.isPlaying}`, 10, 85);
-      ctx.fillText(`ScrollIndex: ${this.scrollToIndex}`, 10, 110);
-      console.info('[LyricPlayer] ✓ Debug text drawn');
-
-      // ============================================================
-      // 第七步：检查是否有歌词数据
-      // Step 7: Check if lyrics data exists
+      // 第五步：检查是否有歌词数据
+      // Step 5: Check if lyrics data exists
       // ============================================================
       if (this.lineRenderers.length === 0) {
         // 没有歌词 - 显示黄色警告文本
@@ -584,37 +558,13 @@ export struct CanvasLyricPlayer {
       }
 
       // ============================================================
-      // 第八步：绘制歌词文本（简化版，用于测试）
-      // Step 8: Draw lyrics text (simplified version for testing)
+      // 第六步：使用完整的渲染系统绘制歌词
+      // Step 6: Render lyrics using full rendering system
+      // 包含 Spring 动画、OffscreenCanvas 缓存、视觉效果
+      // Includes Spring animations, OffscreenCanvas caching, visual effects
       // ============================================================
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = `${this.baseFontSize}px ${this.fontFamily}`;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-
-      let testY = 150;
-      const maxLines = Math.min(5, this.lineRenderers.length);
-
-      for (let i = 0; i < maxLines; i++) {
-        const renderer = this.lineRenderers[i];
-        const line = renderer.getLine();
-        const text = line.words.map(w => w.word).join('');
-
-        // 当前播放行显示为青色，其他行显示为白色
-        // Current playing line in cyan, others in white
-        ctx.fillStyle = i === this.scrollToIndex ? '#00FFFF' : '#FFFFFF';
-        ctx.fillText(`${i}: ${text}`, 20, testY);
-        testY += 40;
-      }
-      console.info('[LyricPlayer] ✓ Lyrics text drawn, lines:', maxLines);
-
-      // ============================================================
-      // 原有的复杂渲染逻辑（暂时注释掉用于调试）
-      // Original complex rendering logic (commented out for debugging)
-      // ============================================================
-      /*
       ctx.save();
-      ctx.translate(this.baseFontSize, 150);
+      ctx.translate(this.baseFontSize, this.canvasHeight * this.alignPosition);
 
       for (let i = 0; i < this.lineRenderers.length; i++) {
         const renderer = this.lineRenderers[i];
@@ -626,7 +576,6 @@ export struct CanvasLyricPlayer {
       }
 
       ctx.restore();
-      */
 
     } catch (error) {
       // ============================================================
